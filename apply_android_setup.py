@@ -35,8 +35,8 @@ if manifest_path.exists():
 # Compatible Android build versions
 # ============================================================
 
-# These versions match the modern Flutter Plugin DSL example.
-KOTLIN_VERSION = "1.8.22"
+# Updated Kotlin version to 1.9.23 to resolve Gradle plugin compatibility
+KOTLIN_VERSION = "1.9.23"
 AGP_VERSION = "8.1.0"
 GRADLE_VERSION = "8.0"
 
