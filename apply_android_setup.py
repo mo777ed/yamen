@@ -1,5 +1,4 @@
 import re
-import sys
 from pathlib import Path
 
 
@@ -26,7 +25,6 @@ if manifest_path.exists():
             perms + "    <application",
             1,
         )
-
         manifest_path.write_text(manifest, encoding="utf-8")
         print("AndroidManifest.xml: permissions added")
     else:
@@ -34,36 +32,32 @@ if manifest_path.exists():
 
 
 # ============================================================
-# Versions
+# Compatible Android build versions
 # ============================================================
 
-KOTLIN_VERSION = "2.1.0"
-AGP_VERSION = "7.3.1"
-GRADLE_VERSION = "7.6.3"
+# These versions match the modern Flutter Plugin DSL example.
+KOTLIN_VERSION = "1.8.22"
+AGP_VERSION = "8.1.0"
+GRADLE_VERSION = "8.0"
 
 
 # ============================================================
 # Update Gradle Wrapper
 # ============================================================
 
-wrapper_path = Path(
-    "android/gradle/wrapper/gradle-wrapper.properties"
-)
+wrapper_path = Path("android/gradle/wrapper/gradle-wrapper.properties")
 
 if wrapper_path.exists():
     wrapper = wrapper_path.read_text(encoding="utf-8")
 
     wrapper = re.sub(
         r"distributionUrl=.*",
-        "distributionUrl=https\\://services.gradle.org/distributions/gradle-7.6.3-all.zip",
+        f"distributionUrl=https\\://services.gradle.org/distributions/gradle-{GRADLE_VERSION}-all.zip",
         wrapper,
     )
 
     wrapper_path.write_text(wrapper, encoding="utf-8")
-
-    print(
-        f"Gradle wrapper updated to {GRADLE_VERSION}"
-    )
+    print(f"Gradle wrapper updated to {GRADLE_VERSION}")
 
 
 # ============================================================
@@ -76,7 +70,6 @@ settings_files = [
 ]
 
 for path in settings_files:
-
     if not path.exists():
         continue
 
@@ -89,18 +82,33 @@ for path in settings_files:
         s,
     )
 
-    # Kotlin
+    # Kotlin Gradle Plugin
     s = re.sub(
         r'(id\s*\(?\s*["\']org\.jetbrains\.kotlin\.android["\']\s*\)?\s*version\s*\(?\s*["\'])[^"\']+(["\'])',
         r"\g<1>" + KOTLIN_VERSION + r"\g<2>",
         s,
     )
 
-    path.write_text(s, encoding="utf-8")
+    # Add Google Services plugin declaration using the correct syntax.
+    if "com.google.gms.google-services" not in s:
+        if path.suffix == ".kts":
+            plugin_line = (
+                f'    id("com.google.gms.google-services") '
+                f'version "4.4.2" apply false'
+            )
+        else:
+            plugin_line = (
+                f'    id "com.google.gms.google-services" '
+                f'version "4.4.2" apply false'
+            )
 
-    print(
-        f"{path}: AGP={AGP_VERSION}, Kotlin={KOTLIN_VERSION}"
-    )
+        match = re.search(r'plugins\s*\{', s)
+        if match:
+            position = match.end()
+            s = s[:position] + "\n" + plugin_line + s[position:]
+
+    path.write_text(s, encoding="utf-8")
+    print(f"{path}: AGP={AGP_VERSION}, Kotlin={KOTLIN_VERSION}")
 
 
 # ============================================================
@@ -113,7 +121,6 @@ build_files = [
 ]
 
 for path in build_files:
-
     if not path.exists():
         continue
 
@@ -134,10 +141,7 @@ for path in build_files:
     )
 
     path.write_text(s, encoding="utf-8")
-
-    print(
-        f"{path}: Android/Kotlin versions updated"
-    )
+    print(f"{path}: Android/Kotlin versions updated")
 
 
 # ============================================================
@@ -150,7 +154,6 @@ app_files = [
 ]
 
 for path in app_files:
-
     if not path.exists():
         continue
 
@@ -169,81 +172,26 @@ for path in app_files:
         s,
     )
 
-    # Firebase plugin
+    # Apply Firebase plugin if not already present.
     if "com.google.gms.google-services" not in s:
-
-        if path.name.endswith(".kts"):
-
-            s = s.replace(
-                'id("dev.flutter.flutter-gradle-plugin")',
-                'id("dev.flutter.flutter-gradle-plugin")\n'
-                '    id("com.google.gms.google-services")',
-                1,
+        if path.suffix == ".kts":
+            marker = 'id("dev.flutter.flutter-gradle-plugin")'
+            replacement = (
+                marker
+                + '\n    id("com.google.gms.google-services")'
             )
-
         else:
-
-            s = s.replace(
-                "apply plugin: 'dev.flutter.flutter-gradle-plugin'",
-                "apply plugin: 'dev.flutter.flutter-gradle-plugin'\n"
-                "apply plugin: 'com.google.gms.google-services'",
-                1,
+            marker = "id 'dev.flutter.flutter-gradle-plugin'"
+            replacement = (
+                marker
+                + "\n    id 'com.google.gms.google-services'"
             )
+
+        if marker in s:
+            s = s.replace(marker, replacement, 1)
 
     path.write_text(s, encoding="utf-8")
-
     print(f"{path}: updated")
-
-
-# ============================================================
-# Google Services plugin declaration
-# ============================================================
-
-settings_files = [
-    Path("android/settings.gradle.kts"),
-    Path("android/settings.gradle"),
-]
-
-for path in settings_files:
-
-    if not path.exists():
-        continue
-
-    s = path.read_text(encoding="utf-8")
-
-    if "com.google.gms.google-services" not in s:
-
-        if "pluginManagement" in s:
-
-            # Add plugin to plugins block if possible
-            match = re.search(
-                r"plugins\s*\{",
-                s,
-            )
-
-            if match:
-
-                position = match.end()
-
-                plugin_line = (
-                    '\n    id "com.google.gms.google-services" '
-                    'version "4.4.2" apply false'
-                )
-
-                s = (
-                    s[:position]
-                    + plugin_line
-                    + s[position:]
-                )
-
-                path.write_text(
-                    s,
-                    encoding="utf-8",
-                )
-
-                print(
-                    f"{path}: Google Services plugin declared"
-                )
 
 
 # ============================================================
