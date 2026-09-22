@@ -148,14 +148,26 @@ jobs:
           flutter pub get
 
       # =========================
-      # 15. Build APK
+      # 15. Patch plugin compileSdk versions
+      # =========================
+      # MUST run after the last `flutter pub get` (packages must already be
+      # on disk under pub-cache). Directly patches compileSdkVersion inside
+      # plugin packages (e.g. livekit_client) that declare an older value
+      # than they actually need, fixing:
+      #   "AAPT: error: resource android:attr/lStar not found"
+      - name: Patch plugin compileSdk versions
+        run: |
+          python3 patch_plugin_compilesdk.py
+
+      # =========================
+      # 16. Build APK
       # =========================
       - name: Build APK
         run: |
           flutter build apk --release
 
       # =========================
-      # 16. Check APK
+      # 17. Check APK
       # =========================
       - name: Check APK
         run: |
@@ -169,7 +181,7 @@ jobs:
             -print
 
       # =========================
-      # 17. Upload APK
+      # 18. Upload APK
       # =========================
       - name: Upload APK
         uses: actions/upload-artifact@v4
