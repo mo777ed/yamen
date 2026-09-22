@@ -8,60 +8,220 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
+    steps:
+      # =========================
+      # 1. Download repository
+      # =========================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # =========================
+      # 2. Java
+      # =========================
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+      # =========================
+      # 3. Flutter
+      # =========================
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.24.5'
           channel: stable
           cache: true
 
-      # android/ and ios/ are not committed to the repo, so generate them here.
-      # This keeps the existing lib/ and pubspec.yaml untouched.
-      - name: Generate android/ project files
-        run: flutter create --org com.yemenchat --project-name yemen_chat --platforms=android .
+      # =========================
+      # 4. Generate Android project
+      # =========================
+      - name: Generate Android project
+        run: |
+          flutter create \
+            --org com.yemenchat \
+            --project-name yemen_chat \
+            --platforms=android \
+            .
 
-      # google-services.json is required to build with Firebase.
-      # Add its full content as a repo secret named GOOGLE_SERVICES_JSON:
-      # Settings -> Secrets and variables -> Actions -> New repository secret.
+      # =========================
+      # 5. Write Firebase config
+      # =========================
       - name: Write google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+        run: |
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
 
-      - name: Check google-services.json is not empty
+      # =========================
+      # 6. Check Firebase config
+      # =========================
+      - name: Check google-services.json
         run: |
           if [ ! -s android/app/google-services.json ]; then
-            echo "::error::android/app/google-services.json is empty. Add the GOOGLE_SERVICES_JSON repo secret (Settings -> Secrets and variables -> Actions)."
+            echo "::error::google-services.json is empty."
+            echo "Please add GOOGLE_SERVICES_JSON in:"
+            echo "Settings -> Secrets and variables -> Actions"
             exit 1
           fi
 
-      - name: Apply Android manifest permissions, minSdk and google-services plugin
-        run: python3 apply_android_setup.py
+          echo "google-services.json found successfully."
 
-      - name: Write .env
-        run: cp .env.example .env
+      # =========================
+      # 7. Fix Android configuration
+      # =========================
+      - name: Configure Android
+        run: |
+          python3 apply_android_setup.py
 
+      # =========================
+      # 8. Force compatible AGP version
+      # =========================
+      - name: Fix Android Gradle Plugin version
+        run: |
+          echo "Fixing Android Gradle Plugin version..."
+
+          if [ -f android/settings.gradle ]; then
+            sed -i -E \
+              's/(id "com\.android\.application" version ")[^"]+/\17.3.1/' \
+              android/settings.gradle
+          fi
+
+          if [ -f android/settings.gradle.kts ]; then
+            sed -i -E \
+              's/(id\("com\.android\.application"\) version ")[^"]+/\17.3.1/' \
+              android/settings.gradle.kts
+          fi
+
+          if [ -f android/build.gradle ]; then
+            sed -i -E \
+              's/(com\.android\.tools\.build:gradle:)[0-9.]+/\17.3.1/' \
+              android/build.gradle
+          fi
+
+          if [ -f android/build.gradle.kts ]; then
+            sed -i -E \
+              's/(com\.android\.tools\.build:gradle:)[0-9.]+/\17.3.1/' \
+              android/build.gradle.kts
+          fi
+
+          echo "Android Gradle Plugin configuration updated."
+
+      # =========================
+      # 9. Force Gradle version
+      # =========================
+      - name: Fix Gradle wrapper version
+        run: |
+          echo "Fixing Gradle wrapper..."
+
+          if [ -f android/gradle/wrapper/gradle-wrapper.properties ]; then
+            sed -i -E \
+              's#distributionUrl=.*#distributionUrl=https\://services.gradle.org/distributions/gradle-7.6.3-all.zip#' \
+              android/gradle/wrapper/gradle-wrapper.properties
+          fi
+
+          echo "Gradle 7.6.3 configured."
+
+      # =========================
+      # 10. Verify Android versions
+      # =========================
+      - name: Show Android configuration
+        run: |
+          echo "======================================"
+          echo "Android settings.gradle"
+          echo "======================================"
+
+          if [ -f android/settings.gradle ]; then
+            cat android/settings.gradle
+          fi
+
+          if [ -f android/settings.gradle.kts ]; then
+            cat android/settings.gradle.kts
+          fi
+
+          echo ""
+          echo "======================================"
+          echo "Gradle wrapper"
+          echo "======================================"
+
+          cat android/gradle/wrapper/gradle-wrapper.properties
+
+      # =========================
+      # 11. Create .env
+      # =========================
+      - name: Create .env
+        run: |
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          else
+            touch .env
+          fi
+
+      # =========================
+      # 12. Flutter dependencies
+      # =========================
       - name: Flutter pub get
-        run: flutter pub get
+        run: |
+          flutter pub get
 
+      # =========================
+      # 13. Flutter doctor
+      # =========================
+      - name: Flutter doctor
+        run: |
+          flutter doctor -v
+
+      # =========================
+      # 14. Analyze project
+      # =========================
       - name: Flutter analyze
-        run: flutter analyze
+        run: |
+          flutter analyze
         continue-on-error: true
 
-      - name: Build APK (release, unsigned)
-        run: flutter build apk --release
+      # =========================
+      # 15. Clean project
+      # =========================
+      - name: Flutter clean
+        run: |
+          flutter clean
 
+      # =========================
+      # 16. Get dependencies again
+      # =========================
+      - name: Flutter pub get after clean
+        run: |
+          flutter pub get
+
+      # =========================
+      # 17. Build APK
+      # =========================
+      - name: Build APK
+        run: |
+          flutter build apk --release
+
+      # =========================
+      # 18. Check APK
+      # =========================
+      - name: Check APK
+        run: |
+          echo "======================================"
+          echo "APK files:"
+          echo "======================================"
+
+          find build/app/outputs/flutter-apk \
+            -type f \
+            -name "*.apk" \
+            -print
+
+      # =========================
+      # 19. Upload APK
+      # =========================
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: yemen-chat-release-apk
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
