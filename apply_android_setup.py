@@ -59,10 +59,10 @@ for path in ["android/build.gradle.kts", "android/build.gradle", "android/settin
     if "google-services" in s:
         print(f"{path}: google-services plugin already declared")
         continue
-    if path.endswith("settings.gradle.kts") and "pluginManagement" in s:
+    if "pluginManagement" in s:
         s2 = re.sub(
-            r'(id\("dev\.flutter\.flutter-plugin-loader"\)[^\n]*\n)',
-            r'\1    id("com.google.gms.google-services") version "4.4.2" apply false\n',
+            r'(id\s*\(?\s*["\']dev\.flutter\.flutter-plugin-loader["\']\s*\)?[^\n]*\n)',
+            r'\1    id "com.google.gms.google-services" version "4.4.2" apply false\n',
             s,
             count=1,
         )
@@ -73,8 +73,15 @@ for path in ["android/build.gradle.kts", "android/build.gradle", "android/settin
 
 # Bump the Kotlin Gradle plugin version, since some plugins (e.g. shared_preferences_android)
 # require a newer Kotlin than the one Flutter's templates ship by default.
+# Handles both Groovy settings.gradle (id "..." version "x") and Kotlin DSL (id("...") version "x").
 KOTLIN_VERSION = "2.1.0"
 kotlin_bumped = False
+
+kotlin_plugin_pattern = re.compile(
+    r'(id\s*\(?\s*["\']org\.jetbrains\.kotlin\.android["\']\s*\)?\s*version\s*\(?\s*["\'])'
+    r'[^"\']+'
+    r'(["\']\s*\)?)'
+)
 
 for path in ["android/settings.gradle.kts", "android/settings.gradle"]:
     try:
@@ -82,11 +89,7 @@ for path in ["android/settings.gradle.kts", "android/settings.gradle"]:
             s = f.read()
     except FileNotFoundError:
         continue
-    s2 = re.sub(
-        r'(id\(["\']org\.jetbrains\.kotlin\.android["\']\)\s*version\s*["\'])[^"\']+(["\'])',
-        r"\g<1>" + KOTLIN_VERSION + r"\g<2>",
-        s,
-    )
+    s2 = kotlin_plugin_pattern.sub(r"\g<1>" + KOTLIN_VERSION + r"\g<2>", s)
     if s2 != s:
         with open(path, "w", encoding="utf-8") as f:
             f.write(s2)
@@ -111,4 +114,5 @@ for path in ["android/build.gradle.kts", "android/build.gradle"]:
         kotlin_bumped = True
 
 if not kotlin_bumped:
-    print("Kotlin version: no matching pattern found to bump (check settings.gradle manually)")
+    print("WARNING: Kotlin version pattern not found in any settings/build.gradle file")
+    sys.exit(1)
