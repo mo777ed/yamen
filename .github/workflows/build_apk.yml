@@ -1,0 +1,52 @@
+name: Build APK
+
+# Runs on every push to main, and manually from the Actions tab (Run workflow).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: stable
+          cache: true
+
+      # google-services.json is required for the app to build with Firebase.
+      # Add its full content as a repo secret named GOOGLE_SERVICES_JSON
+      # (Settings -> Secrets and variables -> Actions -> New repository secret),
+      # or commit android/app/google-services.json yourself and delete this step.
+      - name: Write google-services.json
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - name: Write .env
+        run: cp .env.example .env
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter analyze
+        run: flutter analyze
+        continue-on-error: true   # remove this line once analyze is clean, so failures block the build
+
+      - name: Build APK (release, unsigned)
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
