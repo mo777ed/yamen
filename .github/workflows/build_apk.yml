@@ -70,67 +70,19 @@ jobs:
           echo "google-services.json found successfully."
 
       # =========================
-      # 7. Fix Android configuration
+      # 7. Configure Android
       # =========================
       - name: Configure Android
         run: |
           python3 apply_android_setup.py
 
       # =========================
-      # 8. Force compatible AGP version
-      # =========================
-      - name: Fix Android Gradle Plugin version
-        run: |
-          echo "Fixing Android Gradle Plugin version..."
-
-          if [ -f android/settings.gradle ]; then
-            sed -i -E \
-              's/(id "com\.android\.application" version ")[^"]+/\17.3.1/' \
-              android/settings.gradle
-          fi
-
-          if [ -f android/settings.gradle.kts ]; then
-            sed -i -E \
-              's/(id\("com\.android\.application"\) version ")[^"]+/\17.3.1/' \
-              android/settings.gradle.kts
-          fi
-
-          if [ -f android/build.gradle ]; then
-            sed -i -E \
-              's/(com\.android\.tools\.build:gradle:)[0-9.]+/\17.3.1/' \
-              android/build.gradle
-          fi
-
-          if [ -f android/build.gradle.kts ]; then
-            sed -i -E \
-              's/(com\.android\.tools\.build:gradle:)[0-9.]+/\17.3.1/' \
-              android/build.gradle.kts
-          fi
-
-          echo "Android Gradle Plugin configuration updated."
-
-      # =========================
-      # 9. Force Gradle version
-      # =========================
-      - name: Fix Gradle wrapper version
-        run: |
-          echo "Fixing Gradle wrapper..."
-
-          if [ -f android/gradle/wrapper/gradle-wrapper.properties ]; then
-            sed -i -E \
-              's#distributionUrl=.*#distributionUrl=https\://services.gradle.org/distributions/gradle-7.6.3-all.zip#' \
-              android/gradle/wrapper/gradle-wrapper.properties
-          fi
-
-          echo "Gradle 7.6.3 configured."
-
-      # =========================
-      # 10. Verify Android versions
+      # 8. Show Android configuration
       # =========================
       - name: Show Android configuration
         run: |
           echo "======================================"
-          echo "Android settings.gradle"
+          echo "Android settings"
           echo "======================================"
 
           if [ -f android/settings.gradle ]; then
@@ -149,7 +101,7 @@ jobs:
           cat android/gradle/wrapper/gradle-wrapper.properties
 
       # =========================
-      # 11. Create .env
+      # 9. Create .env
       # =========================
       - name: Create .env
         run: |
@@ -160,21 +112,21 @@ jobs:
           fi
 
       # =========================
-      # 12. Flutter dependencies
+      # 10. Flutter dependencies
       # =========================
       - name: Flutter pub get
         run: |
           flutter pub get
 
       # =========================
-      # 13. Flutter doctor
+      # 11. Flutter doctor
       # =========================
       - name: Flutter doctor
         run: |
           flutter doctor -v
 
       # =========================
-      # 14. Analyze project
+      # 12. Analyze project
       # =========================
       - name: Flutter analyze
         run: |
@@ -182,28 +134,28 @@ jobs:
         continue-on-error: true
 
       # =========================
-      # 15. Clean project
+      # 13. Clean project
       # =========================
       - name: Flutter clean
         run: |
           flutter clean
 
       # =========================
-      # 16. Get dependencies again
+      # 14. Get dependencies again
       # =========================
       - name: Flutter pub get after clean
         run: |
           flutter pub get
 
       # =========================
-      # 17. Build APK
+      # 15. Build APK
       # =========================
       - name: Build APK
         run: |
           flutter build apk --release
 
       # =========================
-      # 18. Check APK
+      # 16. Check APK
       # =========================
       - name: Check APK
         run: |
@@ -217,7 +169,7 @@ jobs:
             -print
 
       # =========================
-      # 19. Upload APK
+      # 17. Upload APK
       # =========================
       - name: Upload APK
         uses: actions/upload-artifact@v4
