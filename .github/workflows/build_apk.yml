@@ -70,14 +70,27 @@ jobs:
           echo "google-services.json found successfully."
 
       # =========================
-      # 7. Configure Android
+      # 7. Generate lib/firebase_options.dart
+      # =========================
+      # Replaces the placeholder firebase_options.dart (which intentionally
+      # throws, pending `flutterfire configure`) with a real one built
+      # straight from android/app/google-services.json. No flutterfire_cli
+      # needed since we only target Android.
+      - name: Generate lib/firebase_options.dart
+        env:
+          ANDROID_PACKAGE_NAME: com.yemenchat.yemen_chat
+        run: |
+          python3 generate_firebase_options.py
+
+      # =========================
+      # 8. Configure Android
       # =========================
       - name: Configure Android
         run: |
           python3 apply_android_setup.py
 
       # =========================
-      # 8. Show Android configuration
+      # 9. Show Android configuration
       # =========================
       - name: Show Android configuration
         run: |
@@ -101,7 +114,7 @@ jobs:
           cat android/gradle/wrapper/gradle-wrapper.properties
 
       # =========================
-      # 9. Create .env
+      # 10. Create .env
       # =========================
       - name: Create .env
         run: |
@@ -112,21 +125,21 @@ jobs:
           fi
 
       # =========================
-      # 10. Flutter dependencies
+      # 11. Flutter dependencies
       # =========================
       - name: Flutter pub get
         run: |
           flutter pub get
 
       # =========================
-      # 11. Flutter doctor
+      # 12. Flutter doctor
       # =========================
       - name: Flutter doctor
         run: |
           flutter doctor -v
 
       # =========================
-      # 12. Analyze project
+      # 13. Analyze project
       # =========================
       - name: Flutter analyze
         run: |
@@ -134,21 +147,21 @@ jobs:
         continue-on-error: true
 
       # =========================
-      # 13. Clean project
+      # 14. Clean project
       # =========================
       - name: Flutter clean
         run: |
           flutter clean
 
       # =========================
-      # 14. Get dependencies again
+      # 15. Get dependencies again
       # =========================
       - name: Flutter pub get after clean
         run: |
           flutter pub get
 
       # =========================
-      # 15. Patch plugin compileSdk versions
+      # 16. Patch plugin compileSdk versions
       # =========================
       # MUST run after the last `flutter pub get` (packages must already be
       # on disk under pub-cache). Directly patches compileSdkVersion inside
@@ -160,14 +173,14 @@ jobs:
           python3 patch_plugin_compilesdk.py
 
       # =========================
-      # 16. Build APK
+      # 17. Build APK
       # =========================
       - name: Build APK
         run: |
           flutter build apk --release
 
       # =========================
-      # 17. Check APK
+      # 18. Check APK
       # =========================
       - name: Check APK
         run: |
@@ -181,7 +194,7 @@ jobs:
             -print
 
       # =========================
-      # 18. Upload APK
+      # 19. Upload APK
       # =========================
       - name: Upload APK
         uses: actions/upload-artifact@v4
