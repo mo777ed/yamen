@@ -1,6 +1,5 @@
 name: Build APK
 
-# Runs on every push to main, and manually from the Actions tab (Run workflow).
 on:
   push:
     branches: [main]
@@ -25,12 +24,35 @@ jobs:
           channel: stable
           cache: true
 
-      # google-services.json is required for the app to build with Firebase.
-      # Add its full content as a repo secret named GOOGLE_SERVICES_JSON
-      # (Settings -> Secrets and variables -> Actions -> New repository secret),
-      # or commit android/app/google-services.json yourself and delete this step.
+      # android/ and ios/ are not committed to the repo, so generate them here.
+      # This keeps the existing lib/ and pubspec.yaml untouched.
+      - name: Generate android/ project files
+        run: flutter create --org com.yemenchat --project-name yemen_chat --platforms=android .
+
+      # google-services.json is required to build with Firebase.
+      # Add its full content as a repo secret named GOOGLE_SERVICES_JSON:
+      # Settings -> Secrets and variables -> Actions -> New repository secret.
       - name: Write google-services.json
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - name: Apply Android manifest permissions
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          sed -i '/<application/i\
+    <uses-permission android:name="android.permission.INTERNET"/>\
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>' "$MANIFEST"
+
+      - name: Set minSdkVersion
+        run: sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/' android/app/build.gradle.kts || sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/' android/app/build.gradle
+
+      - name: Add Google services Gradle plugin
+        run: |
+          sed -i "s/id(\"dev.flutter.flutter-gradle-plugin\")/id(\"dev.flutter.flutter-gradle-plugin\")\n    id(\"com.google.gms.google-services\")/" android/app/build.gradle.kts || true
+          sed -i "/apply plugin: 'dev.flutter.flutter-gradle-plugin'/a apply plugin: 'com.google.gms.google-services'" android/app/build.gradle || true
 
       - name: Write .env
         run: cp .env.example .env
@@ -40,7 +62,7 @@ jobs:
 
       - name: Flutter analyze
         run: flutter analyze
-        continue-on-error: true   # remove this line once analyze is clean, so failures block the build
+        continue-on-error: true
 
       - name: Build APK (release, unsigned)
         run: flutter build apk --release
