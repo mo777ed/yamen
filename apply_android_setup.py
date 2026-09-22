@@ -152,52 +152,77 @@ for path in build_files:
 
 # ============================================================
 # Force compileSdk on every subproject (fixes plugins like livekit_client
-# that pin their own, older compileSdk and fail on newer resource attrs)
+# that pin their own, older compileSdk and fail on newer resource attrs,
+# e.g. android:attr/lStar which only exists from API 31 onward)
 # ============================================================
+#
+# IMPORTANT: the default Flutter root build.gradle ends with a block like:
+#
+#     subprojects {
+#         project.evaluationDependsOn(':app')
+#     }
+#
+# which forces immediate evaluation of :app. If we register our afterEvaluate
+# hook in a SEPARATE subprojects{} block placed after that one, Gradle fails
+# with "Cannot run Project.afterEvaluate(Closure) when the project is
+# already evaluated." So instead of appending a new block, we inject our
+# hook as the FIRST statement inside the EXISTING subprojects{} block (or
+# create one if none exists), which guarantees it is registered before
+# evaluationDependsOn forces evaluation.
 
-groovy_override = f"""
-subprojects {{
-    afterEvaluate {{ proj ->
-        if (proj.hasProperty('android')) {{
-            proj.android {{
-                compileSdkVersion {COMPILE_SDK}
-                if (namespace == null) {{
-                    namespace proj.group.toString()
-                }}
-            }}
-        }}
-    }}
-}}
-"""
+groovy_inject = (
+    "\n    afterEvaluate {\n"
+    "        if (hasProperty('android')) {\n"
+    "            android {\n"
+    f"                compileSdkVersion {COMPILE_SDK}\n"
+    "                if (namespace == null) {\n"
+    "                    namespace group.toString()\n"
+    "                }\n"
+    "            }\n"
+    "        }\n"
+    "    }\n"
+)
 
-kts_override = f"""
-subprojects {{
-    afterEvaluate {{
-        extensions.findByName("android")?.let {{ ext ->
-            val android = ext as com.android.build.gradle.BaseExtension
-            android.compileSdkVersion({COMPILE_SDK})
-        }}
-    }}
-}}
-"""
+kts_inject = (
+    "\n    afterEvaluate {\n"
+    "        extensions.findByName(\"android\")?.let { ext ->\n"
+    "            val android = ext as com.android.build.gradle.BaseExtension\n"
+    f"            android.compileSdkVersion({COMPILE_SDK})\n"
+    "        }\n"
+    "    }\n"
+)
+
+
+def inject_into_subprojects(text: str, inject: str, marker: str) -> str:
+    if marker in text:
+        return text  # already applied
+    match = re.search(r"subprojects\s*\{", text)
+    if match:
+        pos = match.end()
+        return text[:pos] + inject + text[pos:]
+    # No existing subprojects{} block: append a new, self-contained one.
+    return text + "\nsubprojects {" + inject + "}\n"
+
 
 root_groovy = Path("android/build.gradle")
 root_kts = Path("android/build.gradle.kts")
 
 if root_groovy.exists():
     s = root_groovy.read_text(encoding="utf-8")
-    if f"compileSdkVersion {COMPILE_SDK}" not in s:
-        with root_groovy.open("a", encoding="utf-8") as f:
-            f.write(groovy_override)
-        print(f"{root_groovy}: compileSdk {COMPILE_SDK} override appended to subprojects")
+    marker = f"compileSdkVersion {COMPILE_SDK}"
+    new_s = inject_into_subprojects(s, groovy_inject, marker)
+    if new_s != s:
+        root_groovy.write_text(new_s, encoding="utf-8")
+        print(f"{root_groovy}: compileSdk {COMPILE_SDK} override injected into subprojects{{}}")
     else:
         print(f"{root_groovy}: compileSdk override already present")
 elif root_kts.exists():
     s = root_kts.read_text(encoding="utf-8")
-    if f"compileSdkVersion({COMPILE_SDK})" not in s:
-        with root_kts.open("a", encoding="utf-8") as f:
-            f.write(kts_override)
-        print(f"{root_kts}: compileSdk {COMPILE_SDK} override appended to subprojects")
+    marker = f"compileSdkVersion({COMPILE_SDK})"
+    new_s = inject_into_subprojects(s, kts_inject, marker)
+    if new_s != s:
+        root_kts.write_text(new_s, encoding="utf-8")
+        print(f"{root_kts}: compileSdk {COMPILE_SDK} override injected into subprojects{{}}")
     else:
         print(f"{root_kts}: compileSdk override already present")
 else:
