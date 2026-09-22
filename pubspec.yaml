@@ -61,5 +61,5 @@ flutter:
   assets:
     - .env
     - assets/l10n/
-    - assets/lottie/
+   
     
