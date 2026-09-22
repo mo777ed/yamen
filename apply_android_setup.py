@@ -40,6 +40,12 @@ KOTLIN_VERSION = "1.9.23"
 AGP_VERSION = "8.1.0"
 GRADLE_VERSION = "8.0"
 
+# All Android library subprojects (including plugin packages like livekit_client)
+# are forced to build against this compileSdk. Some plugins declare a compileSdk
+# lower than what they actually need, which breaks on attrs added in newer
+# Android versions (e.g. android:attr/lStar, added in API 31).
+COMPILE_SDK = 34
+
 
 # ============================================================
 # Update Gradle Wrapper
@@ -145,6 +151,60 @@ for path in build_files:
 
 
 # ============================================================
+# Force compileSdk on every subproject (fixes plugins like livekit_client
+# that pin their own, older compileSdk and fail on newer resource attrs)
+# ============================================================
+
+groovy_override = f"""
+subprojects {{
+    afterEvaluate {{ proj ->
+        if (proj.hasProperty('android')) {{
+            proj.android {{
+                compileSdkVersion {COMPILE_SDK}
+                if (namespace == null) {{
+                    namespace proj.group.toString()
+                }}
+            }}
+        }}
+    }}
+}}
+"""
+
+kts_override = f"""
+subprojects {{
+    afterEvaluate {{
+        extensions.findByName("android")?.let {{ ext ->
+            val android = ext as com.android.build.gradle.BaseExtension
+            android.compileSdkVersion({COMPILE_SDK})
+        }}
+    }}
+}}
+"""
+
+root_groovy = Path("android/build.gradle")
+root_kts = Path("android/build.gradle.kts")
+
+if root_groovy.exists():
+    s = root_groovy.read_text(encoding="utf-8")
+    if f"compileSdkVersion {COMPILE_SDK}" not in s:
+        with root_groovy.open("a", encoding="utf-8") as f:
+            f.write(groovy_override)
+        print(f"{root_groovy}: compileSdk {COMPILE_SDK} override appended to subprojects")
+    else:
+        print(f"{root_groovy}: compileSdk override already present")
+elif root_kts.exists():
+    s = root_kts.read_text(encoding="utf-8")
+    if f"compileSdkVersion({COMPILE_SDK})" not in s:
+        with root_kts.open("a", encoding="utf-8") as f:
+            f.write(kts_override)
+        print(f"{root_kts}: compileSdk {COMPILE_SDK} override appended to subprojects")
+    else:
+        print(f"{root_kts}: compileSdk override already present")
+else:
+    print("WARNING: no root android/build.gradle(.kts) found to patch for compileSdk override")
+
+
+# ============================================================
 # Firebase Google Services Plugin
 # ============================================================
 
@@ -205,5 +265,6 @@ print("==============================================")
 print(f"AGP version     : {AGP_VERSION}")
 print(f"Kotlin version  : {KOTLIN_VERSION}")
 print(f"Gradle version  : {GRADLE_VERSION}")
+print(f"compileSdk      : {COMPILE_SDK} (forced on all subprojects)")
 print("==============================================")
 print("Android setup completed successfully.")
