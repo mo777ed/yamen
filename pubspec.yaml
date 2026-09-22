@@ -62,4 +62,4 @@ flutter:
     - .env
     - assets/l10n/
     - assets/lottie/
-    - assets/images/
+    
