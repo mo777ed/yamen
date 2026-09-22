@@ -70,3 +70,45 @@ for path in ["android/build.gradle.kts", "android/build.gradle", "android/settin
             with open(path, "w", encoding="utf-8") as f:
                 f.write(s2)
             print(f"{path}: google-services plugin declared")
+
+# Bump the Kotlin Gradle plugin version, since some plugins (e.g. shared_preferences_android)
+# require a newer Kotlin than the one Flutter's templates ship by default.
+KOTLIN_VERSION = "2.1.0"
+kotlin_bumped = False
+
+for path in ["android/settings.gradle.kts", "android/settings.gradle"]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            s = f.read()
+    except FileNotFoundError:
+        continue
+    s2 = re.sub(
+        r'(id\(["\']org\.jetbrains\.kotlin\.android["\']\)\s*version\s*["\'])[^"\']+(["\'])',
+        r"\g<1>" + KOTLIN_VERSION + r"\g<2>",
+        s,
+    )
+    if s2 != s:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(s2)
+        print(f"{path}: Kotlin Gradle plugin bumped to {KOTLIN_VERSION}")
+        kotlin_bumped = True
+
+for path in ["android/build.gradle.kts", "android/build.gradle"]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            s = f.read()
+    except FileNotFoundError:
+        continue
+    s2 = re.sub(
+        r"(ext\.kotlin_version\s*=\s*['\"])[^'\"]+(['\"])",
+        r"\g<1>" + KOTLIN_VERSION + r"\g<2>",
+        s,
+    )
+    if s2 != s:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(s2)
+        print(f"{path}: ext.kotlin_version bumped to {KOTLIN_VERSION}")
+        kotlin_bumped = True
+
+if not kotlin_bumped:
+    print("Kotlin version: no matching pattern found to bump (check settings.gradle manually)")
