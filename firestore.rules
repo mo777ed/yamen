@@ -1,0 +1,166 @@
+rules_version = '2';
+
+// Yemen Chat - Firestore security rules.
+// Principle: the client NEVER writes wallet, XP, gifts, games, rankings,
+// roles, bans or audit data. Those collections are Functions-only.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function roleOf() { return request.auth.token.get('role', 'user'); }
+    function isStaff() { return signedIn() && roleOf() in ['moderator', 'admin', 'super_admin']; }
+    function isAdmin() { return signedIn() && roleOf() in ['admin', 'super_admin']; }
+    function active() { return signedIn() && request.auth.token.get('banned', false) != true; }
+    function onlyChanges(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+    function roomMember(roomId) {
+      return exists(/databases/$(database)/documents/rooms/$(roomId)/members/$(me()));
+    }
+    function notMuted(roomId) {
+      let m = get(/databases/$(database)/documents/rooms/$(roomId)/members/$(me())).data;
+      return m.get('mutedUntil', null) == null || m.mutedUntil < request.time;
+    }
+
+    // ---------- Users ----------
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow update: if active() && me() == uid
+        && onlyChanges(['displayName', 'bio', 'avatarUrl', 'country', 'lang', 'gender', 'lastSeen', 'privacy'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 40
+        && request.resource.data.get('bio', '').size() <= 160;
+      allow create, delete: if false;
+
+      match /private/{doc} { allow read: if signedIn() && (me() == uid || isStaff()); allow write: if false; }
+      match /devices/{token} { allow read, write: if signedIn() && me() == uid; }
+    }
+    match /usernames/{name} { allow read: if signedIn(); allow write: if false; }
+
+    // ---------- Wallet / economy (server-authoritative) ----------
+    match /wallets/{uid} {
+      allow read: if signedIn() && (me() == uid || isStaff());
+      allow write: if false;
+      match /transactions/{id} { allow read: if signedIn() && (me() == uid || isStaff()); allow write: if false; }
+    }
+    match /user_levels/{uid} { allow read: if signedIn(); allow write: if false; }
+    match /user_vip/{uid} { allow read: if signedIn(); allow write: if false; }
+    match /gift_transactions/{id} {
+      allow read: if signedIn() && (resource.data.senderId == me() || resource.data.receiverId == me() || isStaff());
+      allow write: if false;
+    }
+    match /gifts/{id} { allow read: if signedIn(); allow write: if false; }
+    match /vip_levels/{id} { allow read: if signedIn(); allow write: if false; }
+    match /games/{id} { allow read: if signedIn(); allow write: if false; }
+    match /game_sessions/{id} { allow read: if signedIn() && (resource.data.userId == me() || isStaff()); allow write: if false; }
+    match /settings/{id} { allow read: if signedIn(); allow write: if false; }
+    match /events/{id} { allow read: if signedIn(); allow write: if false; }
+    match /banners/{id} { allow read: if signedIn(); allow write: if false; }
+    match /rankings/{setId}/entries/{id} { allow read: if signedIn(); allow write: if false; }
+    match /audit_logs/{id} { allow read: if isAdmin(); allow write: if false; }
+    match /stats/{id} { allow read: if isStaff(); allow write: if false; }
+    match /idempotency/{id} { allow read, write: if false; }
+
+    // ---------- Rooms ----------
+    match /rooms/{roomId} {
+      allow read: if signedIn();
+      allow update: if active() && resource.data.ownerId == me()
+        && onlyChanges(['name', 'nameLower', 'coverUrl', 'category', 'description']);
+      allow create, delete: if false;
+
+      match /seats/{n} { allow read: if signedIn(); allow write: if false; }
+      match /members/{uid} { allow read: if signedIn(); allow write: if false; }
+      match /messages/{id} {
+        allow read: if signedIn();
+        allow create: if active() && roomMember(roomId) && notMuted(roomId)
+          && request.resource.data.keys().hasOnly(['senderId', 'senderName', 'senderAvatar', 'senderLevel', 'text', 'type', 'mentions', 'createdAt'])
+          && request.resource.data.senderId == me()
+          && request.resource.data.type == 'text'
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 300
+          && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+    match /rooms_private/{roomId} { allow read, write: if false; }
+
+    // ---------- Social ----------
+    match /follows/{id} {
+      allow read: if signedIn();
+      allow create: if active() && request.resource.data.followerId == me()
+        && id == request.resource.data.followerId + '_' + request.resource.data.followeeId
+        && request.resource.data.followerId != request.resource.data.followeeId;
+      allow delete: if signedIn() && resource.data.followerId == me();
+      allow update: if false;
+    }
+    match /blocks/{id} {
+      allow read: if signedIn() && resource.data.blockerId == me();
+      allow create: if active() && request.resource.data.blockerId == me()
+        && id == request.resource.data.blockerId + '_' + request.resource.data.blockedId;
+      allow delete: if signedIn() && resource.data.blockerId == me();
+      allow update: if false;
+    }
+    match /friend_requests/{id} {
+      allow read: if signedIn() && (resource.data.from == me() || resource.data.to == me());
+      allow create: if active() && request.resource.data.from == me() && request.resource.data.status == 'pending';
+      allow update, delete: if false;
+    }
+    match /friends/{uid}/list/{friendUid} { allow read: if signedIn() && me() == uid; allow write: if false; }
+
+    match /posts/{id} {
+      allow read: if signedIn();
+      allow create: if active() && request.resource.data.authorId == me()
+        && request.resource.data.text is string && request.resource.data.text.size() <= 500
+        && request.resource.data.createdAt == request.time;
+      allow delete: if signedIn() && (resource.data.authorId == me() || isStaff());
+      allow update: if false;
+    }
+
+    // ---------- Private chat ----------
+    match /chats/{chatId} {
+      allow read: if signedIn() && me() in resource.data.participants;
+      allow create: if active() && me() in request.resource.data.participants
+        && request.resource.data.participants.size() == 2
+        && request.resource.data.participants[0] != request.resource.data.participants[1]
+        && (chatId == request.resource.data.participants[0] + '_' + request.resource.data.participants[1]
+            || chatId == request.resource.data.participants[1] + '_' + request.resource.data.participants[0]);
+      allow update, delete: if false;
+
+      match /messages/{id} {
+        allow read: if signedIn() && me() in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow create: if active() && request.resource.data.senderId == me()
+          && me() in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+          && request.resource.data.keys().hasOnly(['senderId', 'text', 'imageUrl', 'readBy', 'createdAt'])
+          && request.resource.data.get('text', '').size() <= 1000
+          && request.resource.data.createdAt == request.time;
+        allow update: if signedIn() && me() in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+          && onlyChanges(['readBy']);
+        allow delete: if false;
+      }
+    }
+
+    // ---------- Notifications ----------
+    match /notifications/{uid}/items/{id} {
+      allow read: if signedIn() && me() == uid;
+      allow update: if signedIn() && me() == uid && onlyChanges(['read']);
+      allow create, delete: if false;
+    }
+
+    // ---------- Agencies / hosts ----------
+    match /agencies/{id} { allow read: if signedIn(); allow write: if false; }
+    match /agency_members/{id} { allow read: if signedIn(); allow write: if false; }
+    match /hosts/{uid} { allow read: if signedIn(); allow write: if false; }
+
+    // ---------- Reports ----------
+    match /reports/{id} {
+      allow create: if active() && request.resource.data.reporterId == me()
+        && request.resource.data.status == 'open'
+        && request.resource.data.targetType in ['user', 'room', 'message']
+        && request.resource.data.reason is string && request.resource.data.reason.size() <= 500;
+      allow read: if signedIn() && (resource.data.reporterId == me() || isStaff());
+      allow update, delete: if false;
+    }
+  }
+}

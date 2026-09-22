@@ -1,0 +1,26 @@
+{
+  "indexes": [
+    { "collectionGroup": "rooms", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "status", "order": "ASCENDING"}, {"fieldPath": "memberCount", "order": "DESCENDING"} ] },
+    { "collectionGroup": "rooms", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "status", "order": "ASCENDING"}, {"fieldPath": "createdAt", "order": "DESCENDING"} ] },
+    { "collectionGroup": "rooms", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "status", "order": "ASCENDING"}, {"fieldPath": "featured", "order": "ASCENDING"}, {"fieldPath": "memberCount", "order": "DESCENDING"} ] },
+    { "collectionGroup": "rooms", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "status", "order": "ASCENDING"}, {"fieldPath": "category", "order": "ASCENDING"}, {"fieldPath": "memberCount", "order": "DESCENDING"} ] },
+    { "collectionGroup": "rooms", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "status", "order": "ASCENDING"}, {"fieldPath": "country", "order": "ASCENDING"}, {"fieldPath": "memberCount", "order": "DESCENDING"} ] },
+    { "collectionGroup": "gift_transactions", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "receiverId", "order": "ASCENDING"}, {"fieldPath": "createdAt", "order": "DESCENDING"} ] },
+    { "collectionGroup": "gift_transactions", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "senderId", "order": "ASCENDING"}, {"fieldPath": "createdAt", "order": "DESCENDING"} ] },
+    { "collectionGroup": "gift_transactions", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "roomId", "order": "ASCENDING"}, {"fieldPath": "createdAt", "order": "DESCENDING"} ] },
+    { "collectionGroup": "transactions", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "type", "order": "ASCENDING"}, {"fieldPath": "createdAt", "order": "DESCENDING"} ] },
+    { "collectionGroup": "follows", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "followeeId", "order": "ASCENDING"}, {"fieldPath": "createdAt", "order": "DESCENDING"} ] },
+    { "collectionGroup": "follows", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "followerId", "order": "ASCENDING"}, {"fieldPath": "createdAt", "order": "DESCENDING"} ] },
+    { "collectionGroup": "chats", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "participants", "arrayConfig": "CONTAINS"}, {"fieldPath": "lastAt", "order": "DESCENDING"} ] },
+    { "collectionGroup": "reports", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "status", "order": "ASCENDING"}, {"fieldPath": "createdAt", "order": "DESCENDING"} ] },
+    { "collectionGroup": "hosts", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "agencyId", "order": "ASCENDING"}, {"fieldPath": "earnings", "order": "DESCENDING"} ] },
+    { "collectionGroup": "posts", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "authorId", "order": "ASCENDING"}, {"fieldPath": "createdAt", "order": "DESCENDING"} ] },
+    { "collectionGroup": "friend_requests", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "to", "order": "ASCENDING"}, {"fieldPath": "status", "order": "ASCENDING"}, {"fieldPath": "createdAt", "order": "DESCENDING"} ] },
+    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "followersCount", "order": "DESCENDING"} ] },
+    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "vipLevel", "order": "DESCENDING"}, {"fieldPath": "lastSeen", "order": "DESCENDING"} ] },
+    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "status", "order": "ASCENDING"}, {"fieldPath": "bannedUntil", "order": "ASCENDING"} ] },
+    { "collectionGroup": "user_vip", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "level", "order": "ASCENDING"}, {"fieldPath": "expiresAt", "order": "ASCENDING"} ] },
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "active", "order": "ASCENDING"}, {"fieldPath": "startsAt", "order": "DESCENDING"} ] }
+  ],
+  "fieldOverrides": []
+}

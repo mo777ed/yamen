@@ -1,0 +1,14 @@
+.env
+functions/.env
+functions/.env.*
+functions/service-account*.json
+functions/node_modules/
+functions/lib/
+.dart_tool/
+build/
+*.iml
+.idea/
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+key.properties
+*.jks
