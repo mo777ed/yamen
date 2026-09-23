@@ -1,0 +1,82 @@
+name: Deploy Firebase
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/**'
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - 'database.rules.json'
+      - 'storage.rules'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Functions dependencies
+        working-directory: functions
+        run: npm install
+
+      - name: Build Functions
+        working-directory: functions
+        run: npm run build
+
+      # Add a repo secret named FIREBASE_SERVICE_ACCOUNT_JSON with the full
+      # content of a Google Cloud service account key (see the setup guide).
+      - name: Write service account key
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > /tmp/gcp-key.json
+
+      - name: Check service account key is not empty
+        run: |
+          if [ ! -s /tmp/gcp-key.json ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT_JSON secret is missing or empty."
+            exit 1
+          fi
+
+      # ---------------------------------------------------------------
+      # 1) Security rules + indexes: do NOT require the Blaze plan.
+      #    Safe to run even before upgrading billing.
+      # ---------------------------------------------------------------
+      - name: Deploy Firestore rules and indexes
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: npx firebase-tools@latest deploy --project "$FIREBASE_PROJECT_ID" --only firestore --non-interactive
+
+      - name: Deploy Realtime Database rules
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: npx firebase-tools@latest deploy --project "$FIREBASE_PROJECT_ID" --only database --non-interactive
+
+      - name: Deploy Storage rules
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: npx firebase-tools@latest deploy --project "$FIREBASE_PROJECT_ID" --only storage --non-interactive
+
+      # ---------------------------------------------------------------
+      # 2) Cloud Functions: REQUIRES the Blaze (pay-as-you-go) plan.
+      #    This step deploys only the functions needed for account
+      #    creation / login / profile setup, which do NOT need LiveKit
+      #    secrets. Voice-room functions (joinRoom, manageSeat, ...) are
+      #    deployed separately later, once LiveKit is configured.
+      # ---------------------------------------------------------------
+      - name: Deploy auth Cloud Functions (requires Blaze plan)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: |
+          npx firebase-tools@latest deploy --project "$FIREBASE_PROJECT_ID" --non-interactive \
+            --only functions:onUserCreated,functions:completeProfile,functions:claimDailyLogin,functions:deleteAccount,functions:onPresenceChanged
