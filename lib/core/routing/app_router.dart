@@ -32,8 +32,25 @@ import '../../features/wallet/presentation/wallet_screen.dart';
 import '../storage/local_prefs.dart';
 import 'main_shell.dart';
 
+// ---------------------------------------------------------------------
+// TEMPORARY PREVIEW BYPASS - set to false (or delete this block) once
+// login/Cloud Functions are confirmed working. While true, the app skips
+// the entire auth gate and opens straight to /home, so you can browse the
+// UI without signing in. Screens that need real data (rooms, profile,
+// wallet...) will show a connection/permission error instead of data,
+// since you are not actually authenticated with Firebase - that is
+// expected and not a bug.
+// ---------------------------------------------------------------------
+const bool kSkipAuthForPreview = true;
+
 /// Pure redirect decision, kept separate so it can be unit-tested.
 String? decideRedirect({required Session? session, required String location, required bool onboarded}) {
+  if (kSkipAuthForPreview) {
+    if (location == '/splash' || location == '/onboarding' || location.startsWith('/auth') || location == '/banned') {
+      return '/home';
+    }
+    return null;
+  }
   final status = session?.status ?? SessionStatus.loading;
   final user = session?.user;
   bool isAuthRoute() => location.startsWith('/auth') || location == '/onboarding';
