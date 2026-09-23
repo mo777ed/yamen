@@ -16,7 +16,6 @@
     { "collectionGroup": "hosts", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "agencyId", "order": "ASCENDING"}, {"fieldPath": "earnings", "order": "DESCENDING"} ] },
     { "collectionGroup": "posts", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "authorId", "order": "ASCENDING"}, {"fieldPath": "createdAt", "order": "DESCENDING"} ] },
     { "collectionGroup": "friend_requests", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "to", "order": "ASCENDING"}, {"fieldPath": "status", "order": "ASCENDING"}, {"fieldPath": "createdAt", "order": "DESCENDING"} ] },
-    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "followersCount", "order": "DESCENDING"} ] },
     { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "vipLevel", "order": "DESCENDING"}, {"fieldPath": "lastSeen", "order": "DESCENDING"} ] },
     { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "status", "order": "ASCENDING"}, {"fieldPath": "bannedUntil", "order": "ASCENDING"} ] },
     { "collectionGroup": "user_vip", "queryScope": "COLLECTION", "fields": [ {"fieldPath": "level", "order": "ASCENDING"}, {"fieldPath": "expiresAt", "order": "ASCENDING"} ] },
