@@ -32,128 +32,35 @@ if manifest_path.exists():
 
 
 # ============================================================
-# Compatible Android build versions
+# NOTE ON VERSIONS
 # ============================================================
+# This script intentionally does NOT force a specific Gradle / Android
+# Gradle Plugin (AGP) / Kotlin version anymore. `flutter create` (run in
+# the workflow before this script) already generates a project pinned to
+# versions that are tested and compatible with the installed Flutter SDK.
+#
+# An earlier version of this script forced Gradle down to 8.0 and AGP to
+# 8.1.0. That broke Flutter's OWN internal build-tooling project (a small
+# Gradle project bundled inside the Flutter SDK, unrelated to our app),
+# which failed to resolve an old transitive dependency
+# (com.squareup:javawriter:2.5.0) that used to live on the now-shut-down
+# JCenter repository - producing:
+#   "Could not find com.squareup:javawriter:2.5.0 ... project :gradle"
+# If you ever see that error again, it means something is once again
+# overriding Gradle/AGP away from Flutter's own defaults - remove it.
 
-# Updated Kotlin version to 1.9.23 to resolve Gradle plugin compatibility
-KOTLIN_VERSION = "1.9.23"
-AGP_VERSION = "8.1.0"
-GRADLE_VERSION = "8.0"
 
 # All Android library subprojects (including plugin packages like livekit_client)
-# are forced to build against this compileSdk. Some plugins declare a compileSdk
-# lower than what they actually need, which breaks on attrs added in newer
-# Android versions (e.g. android:attr/lStar, added in API 31).
+# are additionally forced to build against this compileSdk. Some plugins declare
+# their own, older compileSdk that lacks newer resource attrs (e.g.
+# android:attr/lStar, added in API 31). This is independent of the AGP/Gradle
+# version and safe to keep.
 COMPILE_SDK = 34
 
 
 # ============================================================
-# Update Gradle Wrapper
-# ============================================================
-
-wrapper_path = Path("android/gradle/wrapper/gradle-wrapper.properties")
-
-if wrapper_path.exists():
-    wrapper = wrapper_path.read_text(encoding="utf-8")
-
-    wrapper = re.sub(
-        r"distributionUrl=.*",
-        f"distributionUrl=https\\://services.gradle.org/distributions/gradle-{GRADLE_VERSION}-all.zip",
-        wrapper,
-    )
-
-    wrapper_path.write_text(wrapper, encoding="utf-8")
-    print(f"Gradle wrapper updated to {GRADLE_VERSION}")
-
-
-# ============================================================
-# Update Android Gradle Plugin + Kotlin
-# ============================================================
-
-settings_files = [
-    Path("android/settings.gradle.kts"),
-    Path("android/settings.gradle"),
-]
-
-for path in settings_files:
-    if not path.exists():
-        continue
-
-    s = path.read_text(encoding="utf-8")
-
-    # Android Gradle Plugin
-    s = re.sub(
-        r'(id\s*\(?\s*["\']com\.android\.application["\']\s*\)?\s*version\s*\(?\s*["\'])[^"\']+(["\'])',
-        r"\g<1>" + AGP_VERSION + r"\g<2>",
-        s,
-    )
-
-    # Kotlin Gradle Plugin
-    s = re.sub(
-        r'(id\s*\(?\s*["\']org\.jetbrains\.kotlin\.android["\']\s*\)?\s*version\s*\(?\s*["\'])[^"\']+(["\'])',
-        r"\g<1>" + KOTLIN_VERSION + r"\g<2>",
-        s,
-    )
-
-    # Add Google Services plugin declaration using the correct syntax.
-    if "com.google.gms.google-services" not in s:
-        if path.suffix == ".kts":
-            plugin_line = (
-                f'    id("com.google.gms.google-services") '
-                f'version "4.4.2" apply false'
-            )
-        else:
-            plugin_line = (
-                f'    id "com.google.gms.google-services" '
-                f'version "4.4.2" apply false'
-            )
-
-        match = re.search(r'plugins\s*\{', s)
-        if match:
-            position = match.end()
-            s = s[:position] + "\n" + plugin_line + s[position:]
-
-    path.write_text(s, encoding="utf-8")
-    print(f"{path}: AGP={AGP_VERSION}, Kotlin={KOTLIN_VERSION}")
-
-
-# ============================================================
-# Update old Groovy build.gradle projects
-# ============================================================
-
-build_files = [
-    Path("android/build.gradle"),
-    Path("android/build.gradle.kts"),
-]
-
-for path in build_files:
-    if not path.exists():
-        continue
-
-    s = path.read_text(encoding="utf-8")
-
-    # Kotlin version
-    s = re.sub(
-        r"(ext\.kotlin_version\s*=\s*['\"])[^'\"]+(['\"])",
-        r"\g<1>" + KOTLIN_VERSION + r"\g<2>",
-        s,
-    )
-
-    # Android Gradle Plugin
-    s = re.sub(
-        r"(com\.android\.tools\.build:gradle:)[0-9.]+",
-        r"\g<1>" + AGP_VERSION,
-        s,
-    )
-
-    path.write_text(s, encoding="utf-8")
-    print(f"{path}: Android/Kotlin versions updated")
-
-
-# ============================================================
 # Force compileSdk on every subproject (fixes plugins like livekit_client
-# that pin their own, older compileSdk and fail on newer resource attrs,
-# e.g. android:attr/lStar which only exists from API 31 onward)
+# that pin their own, older compileSdk and fail on newer resource attrs)
 # ============================================================
 #
 # IMPORTANT: the default Flutter root build.gradle ends with a block like:
@@ -169,6 +76,10 @@ for path in build_files:
 # hook as the FIRST statement inside the EXISTING subprojects{} block (or
 # create one if none exists), which guarantees it is registered before
 # evaluationDependsOn forces evaluation.
+#
+# This is a secondary safety net; patch_plugin_compilesdk.py (run after
+# `flutter pub get`) is the primary, more reliable fix for livekit_client
+# specifically, since it edits the plugin's own build.gradle directly.
 
 groovy_inject = (
     "\n    afterEvaluate {\n"
@@ -230,7 +141,7 @@ else:
 
 
 # ============================================================
-# Firebase Google Services Plugin
+# Firebase Google Services Plugin + minSdk
 # ============================================================
 
 app_files = [
@@ -279,6 +190,38 @@ for path in app_files:
     print(f"{path}: updated")
 
 
+# Register the google-services Gradle plugin declaration (version resolved
+# automatically by Flutter's own dependency management; we just need the
+# plugin id declared so `apply plugin` / `id(...)` above can find it).
+settings_files = [
+    Path("android/settings.gradle.kts"),
+    Path("android/settings.gradle"),
+]
+
+for path in settings_files:
+    if not path.exists():
+        continue
+
+    s = path.read_text(encoding="utf-8")
+
+    if "com.google.gms.google-services" not in s:
+        if path.suffix == ".kts":
+            plugin_line = '    id("com.google.gms.google-services") version "4.4.2" apply false'
+        else:
+            plugin_line = '    id "com.google.gms.google-services" version "4.4.2" apply false'
+
+        match = re.search(r'plugins\s*\{', s)
+        if match:
+            position = match.end()
+            s = s[:position] + "\n" + plugin_line + s[position:]
+            path.write_text(s, encoding="utf-8")
+            print(f"{path}: google-services plugin declared")
+        else:
+            print(f"WARNING: {path} has no plugins {{}} block; could not declare google-services plugin")
+    else:
+        print(f"{path}: google-services plugin already declared")
+
+
 # ============================================================
 # Final checks
 # ============================================================
@@ -287,9 +230,7 @@ print("")
 print("==============================================")
 print("Android build configuration")
 print("==============================================")
-print(f"AGP version     : {AGP_VERSION}")
-print(f"Kotlin version  : {KOTLIN_VERSION}")
-print(f"Gradle version  : {GRADLE_VERSION}")
-print(f"compileSdk      : {COMPILE_SDK} (forced on all subprojects)")
+print("Gradle / AGP / Kotlin : left at flutter create's own defaults")
+print(f"compileSdk (forced)   : {COMPILE_SDK} (subprojects override + patch_plugin_compilesdk.py)")
 print("==============================================")
 print("Android setup completed successfully.")
