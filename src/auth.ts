@@ -48,6 +48,7 @@ export const completeProfile = onCall({ region: REGION }, async (req) => {
   if (ageYears < 13) throw new HttpsError("failed-precondition", "العمر الأدنى لاستخدام التطبيق 13 سنة");
   const bio = optStr(d.bio, "bio", 160) ?? "";
   const avatarUrl = optStr(d.avatarUrl, "avatarUrl", 500);
+  const phone = optStr(d.phone, "phone", 20);
 
   await db.runTransaction(async (tx) => {
     const userRef = db.doc(`users/${uid}`);
@@ -66,7 +67,7 @@ export const completeProfile = onCall({ region: REGION }, async (req) => {
     };
     if (avatarUrl) update.avatarUrl = avatarUrl;
     tx.update(userRef, update);
-    tx.set(db.doc(`users/${uid}/private/profile`), { dob }, { merge: true });
+    tx.set(db.doc(`users/${uid}/private/profile`), { dob, ...(phone ? { phone } : {}) }, { merge: true });
   });
   return { ok: true };
 });
