@@ -6,6 +6,7 @@ import '../../features/admin/presentation/admin_screens.dart';
 import '../../features/agencies/presentation/agency_screen.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/simple_login_screen.dart';
 import '../../features/auth/presentation/misc_screens.dart';
 import '../../features/auth/presentation/otp_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
@@ -41,7 +42,7 @@ import 'main_shell.dart';
 // since you are not actually authenticated with Firebase - that is
 // expected and not a bug.
 // ---------------------------------------------------------------------
-const bool kSkipAuthForPreview = true;
+const bool kSkipAuthForPreview = false;
 
 /// Pure redirect decision, kept separate so it can be unit-tested.
 String? decideRedirect({required Session? session, required String location, required bool onboarded}) {
@@ -108,7 +109,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           if (context.mounted) context.go('/auth/login');
         }),
       ),
-      GoRoute(path: '/auth/login', builder: (_, __) => const LoginScreen()),
+      GoRoute(path: '/auth/login', builder: (_, __) => const SimpleLoginScreen()),
       GoRoute(path: '/auth/otp', builder: (_, __) => const OtpScreen()),
       GoRoute(path: '/auth/register', builder: (_, __) => const RegisterScreen()),
       GoRoute(path: '/banned', builder: (_, __) => const BannedScreen()),
