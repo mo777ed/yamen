@@ -144,6 +144,7 @@ class AuthRepository {
     String? gender,
     String bio = '',
     String? avatarUrl,
+    String? phone,
   }) async {
     await _fn.call(Fn.completeProfile, {
       'username': username,
@@ -154,6 +155,7 @@ class AuthRepository {
       'gender': gender,
       'bio': bio,
       if (avatarUrl != null) 'avatarUrl': avatarUrl,
+      if (phone != null) 'phone': phone,
     });
   }
 
